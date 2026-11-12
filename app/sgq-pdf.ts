@@ -1,0 +1,20 @@
+import {jsPDF} from 'jspdf';
+import {commonFields,type Kind,type FormData} from './sgq-model';
+export async function downloadSGQ(kind:Kind,data:FormData,number:string,revision:number){
+ const pdf=new jsPDF({unit:'mm',format:'a4'});let y=30;const width=178;
+ const header=()=>{pdf.setFillColor(17,65,45);pdf.rect(0,0,210,22,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(15);pdf.setFont('helvetica','bold');pdf.text('SGQ | Testes e Inspeções',16,12);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(`${number}  |  Revisão ${revision}`,16,18);y=32;};header();
+ const ensure=(h:number)=>{if(y+h>276){pdf.addPage();header();}};
+ function text(s:string,size=10,bold=false){pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);const lines=pdf.splitTextToSize(s,width);for(const line of lines){ensure(6);pdf.setTextColor(41,61,48);pdf.text(line,16,y);y+=5.2;}y+=2;}
+ function title(s:string){ensure(17);y+=4;pdf.setDrawColor(212,224,214);pdf.line(16,y-3,194,y-3);text(s,12,true);}
+ text(kind.title,18,true);text(`Resultado: ${data.result}`,11,true);
+ commonFields.forEach(f=>{let v=(f.key==='client'&&data.common.client==='Outro'?data.common.clientOther:f.key==='pep'&&data.common.pep==='Outro'?data.common.pepOther:data.common[f.key])||'—';if(f.type==='date'&&v!=='—')v=v.split('-').reverse().join('/');text(`${f.label}: ${v}`)});
+ kind.groups.forEach(g=>{title(g.title);(data.groups[g.key]??[]).forEach((row,i)=>{if(g.rows||g.repeat)text(g.rows?.[i]??`Item ${i+1}`,10,true);g.fields.forEach(f=>{text(`${f.label}: ${row[f.key]||'—'}`)});});
+ if(kind.id==='labirinto'&&['left','right'].includes(g.key)){const nums=data.groups[g.key].map(r=>Number(r.gap.replace(',','.'))),avg=nums.reduce((a,b)=>a+b,0)/4,t=Number(data.groups.setup[0].tolerance.replace(',','.'))/100;text(`Média: ${avg.toFixed(3)} mm | Faixa: ${(avg*(1-t)).toFixed(3)} a ${(avg*(1+t)).toFixed(3)} mm`,10,true);}
+ if(kind.id==='topografia'&&['before','after'].includes(g.key)){data.groups[g.key].forEach((r,i)=>{if(r.reference!==''){const n=(v:string)=>Number(v.replace(',','.'));text(`P${i+1} | Dif. esquerda: ${r.left!==''?(n(r.reference)-n(r.left)).toFixed(3):'—'} mm | Dif. direita: ${r.right!==''?(n(r.reference)-n(r.right)).toFixed(3):'—'} mm`);}});}
+ if(kind.id==='area'&&g.key==='team'){const rows=['documentation','traceability','preservation','measurement','organization','team'].flatMap(key=>data.groups[key]??[]),c=rows.filter(r=>r.status==='Conforme').length,nc=rows.filter(r=>r.status==='Não conforme').length,na=rows.filter(r=>r.status==='Não aplicável').length,index=c+nc?c/(c+nc)*100:0;text(`Resumo: ${c} conformes | ${nc} não conformes | ${na} não aplicáveis`,10,true);text(`Índice de conformidade: ${c+nc?index.toFixed(1)+'%':'—'} | Meta sugerida: ≥ 90%`,10,true);}
+ });
+ title('Observações / ressalvas');text(data.notes||'Sem observações.');
+ if(data.photos.length){title('Registro fotográfico / croqui');for(let i=0;i<data.photos.length;i++){const p=data.photos[i];const img=await new Promise<HTMLImageElement>((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=p.url});const canvas=document.createElement('canvas');const scale=Math.min(1,1600/img.width);canvas.width=img.width*scale;canvas.height=img.height*scale;const ctx=canvas.getContext('2d')!;ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);const h=Math.min(100,170*img.height/img.width),w=h*img.width/img.height;ensure(h+20);pdf.addImage(canvas.toDataURL('image/jpeg',.85),'JPEG',16,y,w,h);y+=h+7;text(`Foto ${i+1}: ${p.caption||'Registro da inspeção'}`);}}
+ if(kind.id!=='torque'){title('Responsáveis pela verificação');Object.entries(data.signatures).forEach(([k,v])=>text(`${k}: ${v||'—'}`));text('Identificação dos responsáveis. Não representa assinatura digital.',9);}
+ const pages=pdf.getNumberOfPages();for(let i=1;i<=pages;i++){pdf.setPage(i);pdf.setTextColor(120,135,120);pdf.setFontSize(8);pdf.text(`${number} | Rev. ${revision}`,16,288);pdf.text(`Página ${i} de ${pages}`,170,288);}pdf.save(`${number}-rev-${revision}.pdf`);
+}
