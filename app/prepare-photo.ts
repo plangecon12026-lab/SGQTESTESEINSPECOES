@@ -1,5 +1,9 @@
 const MAX_BYTES = 8 * 1024 * 1024;
-const MAX_SIDE = 2400;
+// Fotos são reduzidas antes do envio para economizar o armazenamento (≈300–500 KB cada).
+// 1600 px no maior lado mantém detalhes legíveis em relatórios A4.
+const MAX_SIDE = 1600;
+const TARGET_BYTES = 500 * 1024;
+const KEEP_AS_IS_BYTES = 350 * 1024;
 const SUPPORTED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 async function decodePhoto(file: File): Promise<ImageBitmap | HTMLImageElement> {
@@ -33,7 +37,7 @@ export async function preparePhoto(file: File): Promise<File> {
   const extension = photoName.split('.').pop()?.toLowerCase();
   const isPhoto = type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(extension || '');
   if (!isPhoto) throw new Error(`${photoName}: selecione uma imagem.`);
-  if (SUPPORTED.has(type) && file.size <= MAX_BYTES) return file;
+  if (SUPPORTED.has(type) && file.size <= KEEP_AS_IS_BYTES) return file;
 
   const image = await decodePhoto(file);
   try {
@@ -46,9 +50,15 @@ export async function preparePhoto(file: File): Promise<File> {
     canvas.height = Math.max(1, Math.round(height * scale));
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Não foi possível preparar a foto neste celular.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    let blob = await jpegBlob(canvas, 0.82);
-    if (blob.size > MAX_BYTES) blob = await jpegBlob(canvas, 0.62);
+    let blob = await jpegBlob(canvas, 0.8);
+    for (const quality of [0.7, 0.6, 0.5]) {
+      if (blob.size <= TARGET_BYTES) break;
+      blob = await jpegBlob(canvas, quality);
+    }
+    if (SUPPORTED.has(type) && blob.size >= file.size) return file;
     if (blob.size > MAX_BYTES) throw new Error('A foto ainda está muito grande. Escolha uma imagem menor.');
     return new File([blob], photoName.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: file.lastModified });
   } finally {
