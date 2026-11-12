@@ -4,7 +4,7 @@ import { CONTRACT_ID } from './db/contract-sql.mjs';
 
 // Equivale ao worker/index.ts do sistema original: valida o contrato da URL e o
 // repassa ao servidor num cabeçalho interno (nunca aceito do navegador).
-const GLOBAL_APIS = ['/api/contracts', '/api/management-session', '/api/management-users'];
+const GLOBAL_APIS = ['/api/health', '/api/contracts', '/api/management-session', '/api/management-users'];
 const known = new Map<string, number>();
 
 async function exists(id: string) {
