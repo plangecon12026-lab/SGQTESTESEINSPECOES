@@ -19,8 +19,8 @@ export async function POST(request: Request) {
   if (!correct) {
     const blockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     await db.prepare(`INSERT INTO management_login_attempts (email,count,blocked_until) VALUES (?,1,'')
-      ON CONFLICT(email) DO UPDATE SET count=CASE WHEN blocked_until<? THEN 1 ELSE count+1 END,
-      blocked_until=CASE WHEN blocked_until<? THEN '' WHEN count>=9 THEN ? ELSE blocked_until END`).bind(email,now,now,blockedUntil).run();
+      ON CONFLICT(email) DO UPDATE SET count=CASE WHEN management_login_attempts.blocked_until<? THEN 1 ELSE management_login_attempts.count+1 END,
+      blocked_until=CASE WHEN management_login_attempts.blocked_until<? THEN '' WHEN management_login_attempts.count>=9 THEN ? ELSE management_login_attempts.blocked_until END`).bind(email,now,now,blockedUntil).run();
     return invalid();
   }
   await db.prepare('DELETE FROM management_login_attempts WHERE email=?').bind(email).run();

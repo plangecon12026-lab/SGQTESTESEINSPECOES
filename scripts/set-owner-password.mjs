@@ -1,9 +1,9 @@
 // Define (ou redefine) a senha do responsável pelo SGQ.
-// Uso: OWNER_EMAIL=... node scripts/set-owner-password.mjs "senha com 12+ caracteres"
+// Uso: OWNER_EMAIL=... node scripts/set-owner-password.mjs "senha com 8+ caracteres (letras, números ou símbolos)"
 import { connect } from './db.mjs';
 const email = (process.env.OWNER_EMAIL || 'smaiavitorvinicius@gmail.com').trim().toLowerCase();
 const password = process.argv[2] || '';
-if (password.length < 12 || password.length > 128) { console.error('Informe uma senha de 12 a 128 caracteres.'); process.exit(1); }
+if (password.length < 8 || password.length > 128) { console.error('Informe uma senha de 8 a 128 caracteres.'); process.exit(1); }
 const ITERATIONS = 100_000;
 const encode = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 async function derived(input, salt) {
